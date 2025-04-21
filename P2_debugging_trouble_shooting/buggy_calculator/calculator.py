@@ -25,6 +25,6 @@ def divide(a, b):
     
     # The bug is here: subtly incorrect for negative numbers
     if a < 0:
-        return -(-a // b)  # This is incorrect for certain values
+        return -(-a / b)  # This is incorrect for certain values
     
     return a / b  # This is the correct implementation 
