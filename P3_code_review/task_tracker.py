@@ -21,39 +21,51 @@ def load_tasks():
             with open(TASKS_FILE, "r") as f:
                 tasks = json.load(f)
         except json.JSONDecodeError:
-            # Bug: Silent failure on corrupted JSON, doesn't initialize 'tasks'
             print("Warning: Tasks file is corrupted.")
-            # Missing: Should initialize tasks = {} here
+            tasks = {}
     else:
         # Create an empty JSON file if it doesn't exist
         save_tasks()
 
 def save_tasks():
     """Save tasks to the JSON file."""
-    # Bug: No error handling for file operations
-    with open(TASKS_FILE, "w") as f:
-        json.dump(tasks, f)
+    try: 
+        with open(TASKS_FILE, "w") as f:
+            json.dump(tasks, f)
+    except IOError as e:
+        print(f"Error saving tasks: {e}")            
 
 def generate_task_id():
     """Generate a new unique task ID."""
-    # Bug: This doesn't guarantee uniqueness if tasks are deleted
-    if not tasks:
-        return 1
-    return max(int(task_id) for task_id in tasks.keys()) + 1
+    existing_ids = [int(task_id) for task_id in tasks.keys()]
+    return str(max(existing_ids) + 1 if existing_ids else 1)
+
+def is_valid_date(date_str):
+    try:
+        due_date = datetime.strptime(date_str, "%Y-%m-%d")
+        if due_date < datetime.today():
+            print("Error: Due date must be in the future.")
+            return False
+        return True
+    except ValueError:
+        print("Error: Invalid date format. Use YYYY-MM-DD.")
+        return False
 
 def add_task():
     """Add a new task."""
     print("\n=== Add New Task ===")
     
     title = input("Enter task title: ")
-    # Bug: Missing validation for empty title
+    if not title:
+        print("Error: Title cannot be empty.")
+        return
     
     description = input("Enter task description: ")
-    
-    # Bug: No validation or error handling for date format
+  
     due_date = input("Enter due date (YYYY-MM-DD): ")
-    
-    # Missing: No validation that the date is in the future
+    if not is_valid_date(due_date):
+        return    
+
     
     task_id = str(generate_task_id())
     tasks[task_id] = {
@@ -61,8 +73,9 @@ def add_task():
         "description": description,
         "due_date": due_date,
         "status": "incomplete",
-        # Bug: Missing created_date field required by specs
+        "created_date": datetime.today().strftime("%Y-%m-%d")
     }
+    
     
     save_tasks()
     print(f"Task {task_id} added successfully!")
@@ -75,11 +88,16 @@ def view_all_tasks():
         print("No tasks found.")
         return
     
-    # Bug: This doesn't format output nicely with proper spacing
-    print("ID | Title | Due Date | Status")
-    print("-" * 40)
+    # Set column widths
+    print("{:<5} {:<25} {:<12} {:<10}".format("ID", "Title", "Due Date", "Status"))
+    print("-" * 60)
     for task_id, task in tasks.items():
-        print(f"{task_id} | {task['title']} | {task['due_date']} | {task['status']}")
+        print("{:<5} {:<25} {:<12} {:<10}".format(
+            task_id,
+            task["title"][:24],  # Truncate long titles
+            task["due_date"],
+            task["status"]
+        ))
 
 def view_task():
     """View details of a specific task."""
@@ -87,7 +105,10 @@ def view_task():
     
     task_id = input("Enter task ID: ")
     
-    # Bug: Missing validation for non-existent task IDs
+    if not task_id.isdigit():
+        print("Invalid input. Task ID must be a number.")
+        return
+
     if task_id not in tasks:
         print(f"Task {task_id} not found.")
         return
@@ -105,7 +126,10 @@ def update_task():
     
     task_id = input("Enter task ID: ")
     
-    # Bug: Missing validation for non-existent task IDs
+    if not task_id.isdigit():
+        print("Invalid input. Task ID must be a number.")
+        return
+    
     if task_id not in tasks:
         print(f"Task {task_id} not found.")
         return
@@ -122,21 +146,31 @@ def update_task():
     print(f"Current Due Date: {task['due_date']}")
     new_due_date = input("New Due Date (YYYY-MM-DD): ")
     
-    # Bug: No validation on due date format
-    
     # Update task with new values, keeping old values if input is empty
     if new_title:
         task['title'] = new_title
     if new_description:
         task['description'] = new_description
     if new_due_date:
-        # Bug: No validation of date format
+        if not is_valid_date(new_due_date):
+            return        
         task['due_date'] = new_due_date
     
     save_tasks()
     print(f"Task {task_id} updated successfully!")
 
-# Bug: Missing implementation of mark_task_complete function (FR1.7)
+def mark_task_complete():
+    """Mark a task as complete."""
+    print("\n=== Mark Task as Complete ===")
+    task_id = input("Enter task ID: ")
+    
+    if task_id not in tasks:
+        print(f"Task {task_id} not found.")
+        return
+
+    tasks[task_id]['status'] = 'complete'
+    save_tasks()
+    print(f"Task {task_id} marked as complete.")
 
 def delete_task():
     """Delete a task."""
@@ -148,11 +182,14 @@ def delete_task():
         print(f"Task {task_id} not found.")
         return
     
-    # Bug: Missing confirmation before deletion
+    confirm = input(f"Are you sure you want to delete task {task_id}? (y/n): ").strip().lower()
     
-    del tasks[task_id]
-    save_tasks()
-    print(f"Task {task_id} deleted successfully!")
+    if confirm == 'y':
+        del tasks[task_id]
+        save_tasks()
+        print(f"Task {task_id} deleted successfully!")
+    else:
+        print("Deletion cancelled.")
 
 def display_menu():
     """Display the main menu."""
@@ -161,9 +198,9 @@ def display_menu():
     print("2. View All Tasks")
     print("3. View Task")
     print("4. Update Task")
-    # Bug: Missing option for marking task as complete
-    print("5. Delete Task")
-    print("6. Exit")
+    print("5. Mark Task as Complete")
+    print("6. Delete Task")
+    print("7. Exit")
 
 def main():
     """Main application function."""
@@ -172,8 +209,11 @@ def main():
     while True:
         display_menu()
         
-        # Bug: No validation on choice input
-        choice = input("Enter your choice (1-6): ")
+        choice = input("Enter your choice (1-7): ")
+        
+        if not choice.isdigit():
+            print("Invalid input. Choice must be a number.")
+            continue       
         
         if choice == "1":
             add_task()
@@ -184,8 +224,10 @@ def main():
         elif choice == "4":
             update_task()
         elif choice == "5":
-            delete_task()
+            mark_task_complete()
         elif choice == "6":
+            delete_task()
+        elif choice == "7":
             print("Exiting Task Tracker. Goodbye!")
             break
         else:
