@@ -73,7 +73,6 @@ def display_all_books():
     books = get_all_books()
     print(format_book_table(books))
 
-# TODO: Implement the get_book_by_id function
 def get_book_by_id(book_id):
     """
     Retrieve a specific book by ID.
@@ -84,77 +83,189 @@ def get_book_by_id(book_id):
     Returns:
         dict: The book data if found, None otherwise
     """
-    # TODO: Implement this function
-    # 1. Send a GET request to the appropriate endpoint
-    # 2. Handle any errors that might occur
-    # 3. Return the book data if successful
-    pass
+    try:
+        response = requests.get(f"{BOOKS_ENDPOINT}/{book_id}")
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.HTTPError as http_err:
+        if response.status_code == 404:
+            print_error("Book not found.")
+        else:
+            print_error(f"HTTP error occurred: {http_err}")
+    except requests.exceptions.RequestException as e:
+        print_error(f"Failed to retrieve book: {e}")
+    return None
 
 def display_book_details():
     """Display details for a specific book."""
     book_id = input("Enter book ID: ")
     
-    # TODO: Implement this functionality
-    # 1. Call get_book_by_id function
-    # 2. Display the book details or error message
-    print_error("This functionality is not implemented yet.")
+    book = get_book_by_id(book_id)
+    if book:
+        print(format_book_table(book))
 
-# TODO: Implement the add_book function
 def add_book():
     """
     Add a new book to the bookstore.
     
     Gather book details from the user and send them to the API.
     """
-    # TODO: Implement this function
-    # 1. Gather book information from the user (title, author, price, in_stock)
-    # 2. Validate the inputs
-    # 3. Send a POST request to the appropriate endpoint
-    # 4. Handle any errors and display appropriate messages
-    print_error("This functionality is not implemented yet.")
+    title = input("Enter the book title: ").strip()
+    author = input("Enter the book author: ").strip()
+    price = input("Enter the book price: ").strip()
+    
+    # Validate in-stock input until y or n
+    while True:
+        in_stock_input = input("Is the book in stock? (yes/no): ").strip().lower()
+        if in_stock_input in ("yes", "no", "y", "n"):
+            break
+        else:
+            print("Please enter 'yes' or 'no'.")
 
-# TODO: Implement the update_book function
+    # Validate the title, author and price have values
+    if not title or not author or not price:
+        print_error("Title, author, and price are required fields.")
+        return
+    
+    #Validate price is correct format
+    try:
+        price = float(price)
+        if price < 0:
+            raise ValueError("Price cannot be negative.")
+    except ValueError:
+        print_error("Invalid price. Please enter a valid number.")
+        return
+
+    # Prepare the data to be sent to the API
+    new_book_data = {
+        "title": title,
+        "author": author,
+        "price": price,
+        "in_stock": in_stock_input
+    }
+
+    try:
+        response = requests.post(BOOKS_ENDPOINT, json=new_book_data)
+        response.raise_for_status()
+        new_book = response.json()
+        print_success(f"Book added successfully: {new_book['title']} by {new_book['author']}")
+    except requests.exceptions.RequestException as e:
+        print_error(f"Failed to add book: {e}")
+
 def update_book():
     """
     Update an existing book's information.
     
     Retrieve the current book information and allow the user to modify it.
     """
-    # TODO: Implement this function
-    # 1. Ask for the book ID to update
-    # 2. Fetch the current book information
-    # 3. Allow the user to update each field (or keep existing values)
-    # 4. Send a PUT request to the appropriate endpoint
-    # 5. Handle any errors and display appropriate messages
-    print_error("This functionality is not implemented yet.")
+    book_id = input("Enter the ID of the book to update: ").strip()
+    if not book_id:
+        print_error("Book ID is required.")
+        return
 
-# TODO: Implement the delete_book function
+    book = get_book_by_id(book_id)
+    if not book:
+        print_error("Book not found.")
+        return
+
+    print_info("Leave input blank to keep existing value.")
+    new_title = input(f"Title [{book['title']}]: ").strip()
+    new_author = input(f"Author [{book['author']}]: ").strip()
+    new_price_input = input(f"Price [{book['price']}]: ").strip()
+    new_in_stock_input = input(f"In stock? (y/n) [{ 'y' if book['in_stock'] else 'n' }]: ").strip().lower()
+
+    # Validate input IF entered
+    if(new_price_input):
+        try:
+            price = float(new_price_input)
+            if price < 0:
+                raise ValueError("Price cannot be negative.")
+        except ValueError:
+            print_error("Invalid price. Please enter a valid number.")
+        return
+
+    if(new_in_stock_input):
+        while True:
+            if new_in_stock_input in ("yes", "no", "y", "n"):
+                break
+            else:
+                print("Please enter 'yes' or 'no'.")
+                new_in_stock_input = input(f"In stock? (y/n) [{ 'y' if book['in_stock'] else 'n' }]: ").strip().lower()
+
+
+    # Use existing values if nothing entered
+    updated_data = {
+        "title": new_title if new_title else book["title"],
+        "author": new_author if new_author else book["author"],
+        "price": float(new_price_input) if new_price_input else book["price"],
+        "in_stock": (
+            book["in_stock"] if new_in_stock_input == ""
+            else new_in_stock_input in ("y", "yes")
+        )
+    }
+
+    try:
+        response = requests.put(f"{BOOKS_ENDPOINT}/{book_id}", json=updated_data)
+        response.raise_for_status()
+        updated_book = response.json()
+        print_success("Book updated successfully!")
+        print(format_book_table(updated_book))
+    except requests.exceptions.RequestException as e:
+        print_error(f"Failed to update book: {e}")
+
 def delete_book():
     """
     Delete a book from the bookstore.
     
     Ask for confirmation before deleting.
     """
-    # TODO: Implement this function
-    # 1. Ask for the book ID to delete
-    # 2. Ask for confirmation (y/n)
-    # 3. Send a DELETE request to the appropriate endpoint
-    # 4. Handle any errors and display appropriate messages
-    print_error("This functionality is not implemented yet.")
+    book_id = input("Enter the ID of the book to delete: ").strip()
+    if not book_id:
+        print_error("Book ID is required.")
+        return
 
-# TODO: Implement the search_books function
+    book = get_book_by_id(book_id)
+    if not book:
+        print_error("Book not found.")
+        return
+
+    # Confirmation to delete 
+    print(format_book_table(book))
+    confirm = input("Are you sure you want to delete this book? (y/n): ").strip().lower()
+    if confirm not in ("y", "yes"):
+        print_info("Delete operation cancelled.")
+        return
+
+    try:
+        response = requests.delete(f"{BOOKS_ENDPOINT}/{book_id}")
+        response.raise_for_status()
+        print_success(f"Book with ID {book_id} deleted successfully.")
+    except requests.exceptions.RequestException as e:
+        print_error(f"Failed to delete book: {e}")
+
 def search_books():
     """
     Search for books by title or author.
     
     Send a search query to the API and display the results.
     """
-    # TODO: Implement this function
-    # 1. Ask for the search query
-    # 2. Validate the query (not empty)
-    # 3. Send a GET request to the search endpoint with the query as a parameter
-    # 4. Handle any errors and display appropriate messages or search results
-    print_error("This functionality is not implemented yet.")
+    query = input("Enter a keyword to search by title or author: ").strip()
+    if not query:
+        print_error("Search query cannot be empty.")
+        return
+
+    try:
+        response = requests.get(f"{BOOKS_ENDPOINT}/search", params={"query": query})
+        response.raise_for_status()
+        results = response.json()
+
+        if results:
+            print_success(f"Found {len(results)} matching book(s):")
+            print(format_book_table(results))
+        else:
+            print_info("No books matched your search.")
+    except requests.exceptions.RequestException as e:
+        print_error(f"Failed to perform search: {e}")
 
 def display_menu():
     """Display the main menu options."""
