@@ -88,7 +88,8 @@ def get_book_by_id(book_id):
         response.raise_for_status()
         return response.json()
     except requests.exceptions.HTTPError as http_err:
-        if response.status_code == 404:
+        # Try to access status code from the error's response object
+        if hasattr(http_err, 'response') and http_err.response is not None and http_err.response.status_code == 404:
             print_error("Book not found.")
         else:
             print_error(f"HTTP error occurred: {http_err}")
