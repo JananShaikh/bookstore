@@ -183,7 +183,7 @@ def update_book():
                 raise ValueError("Price cannot be negative.")
         except ValueError:
             print_error("Invalid price. Please enter a valid number.")
-        return
+            return
 
     if(new_in_stock_input):
         while True:
